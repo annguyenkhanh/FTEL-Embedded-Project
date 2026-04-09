@@ -2084,7 +2084,7 @@ int main(void) {
 	new_cmd_context_t ctx;
 
 	/* Chuoi khoi dong cho demo workspace manager chay tren may host. */
-	new_cmd_line_init(&ctx, "FTEL Workspace Manager", "3.0.0");
+	new_cmd_line_init(&ctx, "Personal CMD Manager", "v.0.0.1");
 	manager_initialize(&ctx);
 	new_cmd_line_attach_commands(&ctx, g_demo_commands);
 	new_cmd_line_set_prompt(&ctx, "workspace> ");
