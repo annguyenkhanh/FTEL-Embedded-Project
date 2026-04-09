@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Tai lieu phan tich code cmd-personal</title>
+<style>
+  body {
+    font-family: DejaVu Sans, Arial, sans-serif;
+    margin: 32px;
+    line-height: 1.6;
+    color: #1f2937;
+  }
+  h1, h2, h3, h4 { color: #111827; }
+  h1 { border-bottom: 2px solid #d1d5db; padding-bottom: 10px; }
+  code { background: #f3f4f6; padding: 2px 5px; border-radius: 4px; }
+  pre { background: #f3f4f6; padding: 14px; border-radius: 8px; overflow: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+  th, td { border: 1px solid #d1d5db; padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: #f9fafb; }
+  blockquote { border-left: 4px solid #d1d5db; padding-left: 12px; color: #4b5563; margin-left: 0; }
+</style>
+</head>
+<body>
+<h1>Tài Liệu Phân Tích Code <code>cmd-personal</code></h1>
+<h2>1. Mục đích của module này</h2>
+<p><code>cmd-personal</code> là một chương trình command-line viết bằng C, chạy trên máy host trong Terminal. Nó có 2 vai trò chính:</p>
+<ol>
+<li>Cung cấp một CLI engine có thể tái sử dụng:
+   parsing input, quản lý prompt, lưu history, help, dispatch command và xuất output qua callback tùy chọn.</li>
+<li>Cung cấp một demo "personal command manager":
+   quét workspace để tìm các thư mục có <code>Makefile</code>, sau đó cho phép người dùng <code>build</code>, <code>run</code>, <code>clean</code>, <code>rebuild</code> các project đó ngay trong một shell tương tác.</li>
+</ol>
+<p>Nói ngắn gọn, đây là một shell nhỏ phục vụ học tập và demo kiến trúc CLI trong C.</p>
+<h2>2. Các file chính</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Vai trò</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>new_cmd_line.h</code></td>
+<td>Header public, chứa macro cấu hình, kiểu dữ liệu, API public</td>
+</tr>
+<tr>
+<td><code>new_cmd_line.c</code></td>
+<td>Toàn bộ phần cài đặt CLI engine, built-in commands, workspace manager, tab completion và <code>main()</code> demo</td>
+</tr>
+<tr>
+<td><code>Makefile</code></td>
+<td>Build binary host-side và chạy chương trình tương tác</td>
+</tr>
+<tr>
+<td><code>out/ftel_workspace_manager</code></td>
+<td>Binary được tạo ra sau khi build</td>
+</tr>
+<tr>
+<td><code>README.md</code></td>
+<td>Hướng dẫn sử dụng nhanh cho user</td>
+</tr>
+</tbody>
+</table>
+<h2>3. Kiến trúc tổng thể</h2>
+<p>Code được tổ chức thành 4 lớp chính:</p>
+<h3>3.1. Lớp CLI engine</h3>
+<p>Đây là phần lõi dùng chung, chịu trách nhiệm:</p>
+<ul>
+<li>Khởi tạo context runtime.</li>
+<li>Nhận input từ Terminal.</li>
+<li>Cắt khoảng trắng đầu cuối.</li>
+<li>Tách input thành <code>argc/argv</code>.</li>
+<li>Tìm command phù hợp.</li>
+<li>Gọi handler tương ứng.</li>
+<li>Trả mã trạng thái cho caller.</li>
+</ul>
+<p>Phần này có thể tái sử dụng cho project khác mà không cần giữ nguyên demo workspace manager.</p>
+<h3>3.2. Lớp built-in commands</h3>
+<p>Đây là nhóm lệnh luôn có sẵn trong shell:</p>
+<ul>
+<li><code>help</code></li>
+<li><code>about</code></li>
+<li><code>version</code></li>
+<li><code>system</code></li>
+<li><code>status</code></li>
+<li><code>time</code></li>
+<li><code>echo</code></li>
+<li><code>prompt</code></li>
+<li><code>history</code></li>
+<li><code>clear</code></li>
+<li><code>exit</code></li>
+</ul>
+<p>Các lệnh này phục vụ thao tác shell chung, không phụ thuộc vào workspace manager.</p>
+<h3>3.3. Lớp workspace manager demo</h3>
+<p>Đây là phần mở rộng gắn vào CLI engine để biến shell thành công cụ quản lý project:</p>
+<ul>
+<li>Tìm workspace root.</li>
+<li>Quét thư mục có <code>Makefile</code>.</li>
+<li>Liệt kê project.</li>
+<li>Resolve tên project.</li>
+<li>Gọi <code>make</code>, <code>make run</code>, <code>make clean</code>.</li>
+</ul>
+<p>Nhóm lệnh của lớp này là:</p>
+<ul>
+<li><code>workspace</code></li>
+<li><code>projects</code></li>
+<li><code>refresh</code></li>
+<li><code>build</code></li>
+<li><code>run</code></li>
+<li><code>clean</code></li>
+<li><code>rebuild</code></li>
+</ul>
+<h3>3.4. Lớp interactive terminal + completion</h3>
+<p>Khi chạy trong terminal thật, chương trình:</p>
+<ul>
+<li>bật raw mode,</li>
+<li>đọc từng phím,</li>
+<li>hỗ trợ <code>Tab</code> completion,</li>
+<li>xử lý <code>Backspace</code>,</li>
+<li>xử lý <code>Ctrl + D</code>,</li>
+<li>đảm bảo restore terminal state khi thoát hoặc nhận signal.</li>
+</ul>
+<h2>4. Luồng chạy tổng thể của chương trình</h2>
+<p>Luồng chạy của bản demo standalone bắt đầu từ <code>main()</code> trong <code>new_cmd_line.c</code>.</p>
+<h3>4.1. Khởi động</h3>
+<p><code>main()</code> thực hiện các bước:</p>
+<ol>
+<li>Tạo <code>new_cmd_context_t ctx</code>.</li>
+<li>Gọi <code>new_cmd_line_init(&amp;ctx, "Personal CMD Manager", "v.0.0.1")</code>.</li>
+<li>Gọi <code>manager_initialize(&amp;ctx)</code> để chuẩn bị workspace metadata.</li>
+<li>Gắn bảng lệnh mở rộng bằng <code>new_cmd_line_attach_commands(&amp;ctx, g_demo_commands)</code>.</li>
+<li>Đổi prompt thành <code>workspace&gt;</code>.</li>
+<li>Gọi <code>new_cmd_line_run(&amp;ctx)</code> để vào vòng lặp REPL.</li>
+</ol>
+<h3>4.2. Vòng lặp REPL</h3>
+<p>Trong <code>new_cmd_line_run()</code>:</p>
+<ul>
+<li>Shell in tên app và version.</li>
+<li>In dòng hướng dẫn <code>Interactive shell ready...</code>.</li>
+<li>Hiển thị prompt.</li>
+<li>Đọc input từ <code>stdin</code>.</li>
+<li>Nếu là TTY thật và có <code>NEW_CMD_LINE_ENABLE_MAIN</code>, shell dùng <code>read_line_with_completion()</code>.</li>
+<li>Nếu không, shell fallback sang <code>fgets()</code>.</li>
+<li>Sau khi đọc xong, shell chuyển input sang <code>new_cmd_line_process()</code>.</li>
+</ul>
+<h3>4.3. Xử lý một dòng lệnh</h3>
+<p><code>new_cmd_line_process()</code> là hàm quan trọng nhất của lõi CLI.</p>
+<p>Nó làm lần lượt:</p>
+<ol>
+<li><code>copy_trimmed_input()</code> để bỏ khoảng trắng đầu/cuối.</li>
+<li><code>push_history()</code> để lưu history.</li>
+<li><code>tokenize_input()</code> để tạo <code>argc/argv</code>.</li>
+<li><code>find_command()</code> để tìm command.</li>
+<li>Gọi <code>handler</code> của command.</li>
+<li>Trả về <code>new_cmd_status_t</code>.</li>
+</ol>
+<p>Nếu có lỗi, hàm này in message tương ứng cho user:</p>
+<ul>
+<li>input quá dài,</li>
+<li>quá nhiều tham số,</li>
+<li>sai cú pháp quote,</li>
+<li>command không tồn tại,</li>
+<li>handler trả lỗi.</li>
+</ul>
+<h2>5. Phân tích <code>new_cmd_line.h</code></h2>
+<p>Header này định nghĩa toàn bộ public contract của module.</p>
+<h3>5.1. Macro cấu hình</h3>
+<p>Các macro có thể override trước khi include header:</p>
+<table>
+<thead>
+<tr>
+<th>Macro</th>
+<th>Giá trị mặc định</th>
+<th>Ý nghĩa</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>NEW_CMD_MAX_INPUT_LEN</code></td>
+<td><code>256</code></td>
+<td>Độ dài tối đa của một dòng lệnh</td>
+</tr>
+<tr>
+<td><code>NEW_CMD_MAX_ARGS</code></td>
+<td><code>10</code></td>
+<td>Số lượng argument tối đa</td>
+</tr>
+<tr>
+<td><code>NEW_CMD_HISTORY_DEPTH</code></td>
+<td><code>8</code></td>
+<td>Số dòng history giữ trong RAM</td>
+</tr>
+<tr>
+<td><code>NEW_CMD_MAX_PROMPT_LEN</code></td>
+<td><code>32</code></td>
+<td>Độ dài tối đa của prompt</td>
+</tr>
+<tr>
+<td><code>NEW_CMD_DEFAULT_PROMPT</code></td>
+<td><code>"ftel&gt; "</code></td>
+<td>Prompt mặc định ban đầu</td>
+</tr>
+</tbody>
+</table>
+<h3>5.2. <code>new_cmd_status_t</code></h3>
+<p>Enum này mô tả trạng thái xử lý của shell:</p>
+<ul>
+<li><code>NEW_CMD_STATUS_OK</code></li>
+<li><code>NEW_CMD_STATUS_EMPTY_INPUT</code></li>
+<li><code>NEW_CMD_STATUS_NULL_CONTEXT</code></li>
+<li><code>NEW_CMD_STATUS_INPUT_TOO_LONG</code></li>
+<li><code>NEW_CMD_STATUS_TOO_MANY_ARGS</code></li>
+<li><code>NEW_CMD_STATUS_PARSE_ERROR</code></li>
+<li><code>NEW_CMD_STATUS_NOT_FOUND</code></li>
+<li><code>NEW_CMD_STATUS_HANDLER_ERROR</code></li>
+</ul>
+<h3>5.3. Kiểu callback và command entry</h3>
+<ul>
+<li><code>new_cmd_writer_t</code>: callback để chuyển hướng output sang nơi khác thay vì <code>stdout</code>.</li>
+<li><code>new_cmd_handler_t</code>: prototype chuẩn cho mọi command handler.</li>
+<li><code>new_cmd_command_t</code>: mô tả một lệnh với <code>name</code>, <code>handler</code>, <code>usage</code>, <code>description</code>.</li>
+</ul>
+<h3>5.4. <code>new_cmd_context_t</code></h3>
+<p>Đây là runtime state của shell. Các field quan trọng:</p>
+<ul>
+<li><code>app_name</code>, <code>version</code>: thông tin nhận diện ứng dụng.</li>
+<li><code>external_commands</code>: bảng lệnh mở rộng ngoài built-in.</li>
+<li><code>writer</code>, <code>writer_user_data</code>: đầu ra tùy chỉnh.</li>
+<li><code>started_at</code>: thời điểm shell khởi động.</li>
+<li><code>history_total</code>: tổng số lệnh đã nhập từ đầu phiên.</li>
+<li><code>running</code>: cờ để giữ hoặc dừng REPL.</li>
+<li><code>history_count</code>, <code>history_head</code>: quản lý history dạng vòng tròn.</li>
+<li><code>prompt</code>: chuỗi prompt hiện tại.</li>
+<li><code>history[][]</code>: vùng nhớ chứa các lệnh trước đó.</li>
+</ul>
+<h3>5.5. Public API</h3>
+<table>
+<thead>
+<tr>
+<th>Hàm</th>
+<th>Vai trò</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>new_cmd_line_init()</code></td>
+<td>Khởi tạo context</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_set_writer()</code></td>
+<td>Đổi output writer</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_set_prompt()</code></td>
+<td>Đổi prompt</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_attach_commands()</code></td>
+<td>Gắn thêm bảng lệnh mở rộng</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_stop()</code></td>
+<td>Yêu cầu shell dừng</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_run()</code></td>
+<td>Chạy REPL</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_printf()</code></td>
+<td>In formatted output</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_process()</code></td>
+<td>Xử lý một dòng lệnh độc lập</td>
+</tr>
+<tr>
+<td><code>new_cmd_line_status_string()</code></td>
+<td>Chuyển enum status sang chuỗi</td>
+</tr>
+</tbody>
+</table>
+<h2>6. Phân tích <code>new_cmd_line.c</code></h2>
+<h2>6.1. Nhóm helper cơ bản</h2>
+<p>Các helper đầu file xử lý những việc nền tảng:</p>
+<ul>
+<li><code>default_writer()</code>: fallback output sang <code>stdout</code>.</li>
+<li><code>write_text()</code>: route output qua writer đã cấu hình.</li>
+<li><code>command_name_equals()</code>: so sánh tên lệnh không phân biệt hoa thường.</li>
+<li><code>count_commands()</code>: đếm số entry trong command table.</li>
+<li><code>find_in_table()</code>: tìm command trong một bảng lệnh.</li>
+<li><code>find_command()</code>: tìm command theo thứ tự <code>external_commands</code> trước, built-in sau.</li>
+</ul>
+<p>Một chi tiết đáng chú ý:</p>
+<ul>
+<li><code>find_command()</code> bỏ qua ký tự <code>*</code> ở đầu command.</li>
+<li>Vì vậy <code>*Build project cmd-personal</code> vẫn được map về handler <code>build</code>.</li>
+</ul>
+<h2>6.2. Xử lý prompt, history và input</h2>
+<p>Các hàm chính:</p>
+<ul>
+<li><code>copy_prompt()</code>: sao chép prompt có kiểm soát độ dài.</li>
+<li><code>copy_trimmed_input()</code>: bỏ khoảng trắng đầu/cuối.</li>
+<li><code>push_history()</code>: lưu lệnh mới vào history vòng tròn.</li>
+<li><code>clear_history()</code>: reset history.</li>
+<li><code>tokenize_input()</code>: parse input thành <code>argv[]</code>.</li>
+<li><code>join_arguments()</code>: ghép argument lại thành chuỗi.</li>
+</ul>
+<p><code>tokenize_input()</code> hỗ trợ:</p>
+<ul>
+<li>chuỗi trong <code>'single quote'</code>,</li>
+<li>chuỗi trong <code>"double quote"</code>,</li>
+<li>ký tự escape bằng <code>\</code>.</li>
+</ul>
+<p>Nếu người dùng nhập sai dấu nháy hoặc quá nhiều argument, hàm sẽ trả status lỗi.</p>
+<h2>6.3. Xử lý thời gian và thông tin hệ thống</h2>
+<p>Nhóm hàm này phục vụ các lệnh <code>status</code>, <code>time</code>, <code>system</code>:</p>
+<ul>
+<li><code>format_time_value()</code></li>
+<li><code>format_uptime()</code></li>
+<li><code>compiler_name()</code></li>
+<li><code>platform_name()</code></li>
+<li><code>c_standard_name()</code></li>
+</ul>
+<p>Chúng giúp shell in được:</p>
+<ul>
+<li>thời gian local,</li>
+<li>uptime,</li>
+<li>compiler hiện tại,</li>
+<li>platform hiện tại,</li>
+<li>chuẩn C đang dùng.</li>
+</ul>
+<h2>6.4. Hệ thống help</h2>
+<p>Hai helper chính:</p>
+<ul>
+<li><code>print_command_summary()</code></li>
+<li><code>print_command_help()</code></li>
+</ul>
+<p>Chúng được dùng bởi lệnh <code>help</code> để:</p>
+<ul>
+<li>liệt kê toàn bộ lệnh,</li>
+<li>hoặc in mô tả chi tiết cho một lệnh cụ thể.</li>
+</ul>
+<h2>6.5. Hàm public quan trọng</h2>
+<h3><code>new_cmd_line_init()</code></h3>
+<p>Khởi tạo context về trạng thái mặc định:</p>
+<ul>
+<li>zero toàn bộ struct,</li>
+<li>đặt <code>app_name</code>,</li>
+<li>đặt <code>version</code>,</li>
+<li>ghi lại <code>started_at</code>,</li>
+<li>bật <code>running</code>,</li>
+<li>gán prompt mặc định.</li>
+</ul>
+<h3><code>new_cmd_line_set_writer()</code></h3>
+<p>Cho phép nhúng module này vào môi trường khác ngoài terminal thông thường, ví dụ:</p>
+<ul>
+<li>UART console,</li>
+<li>GUI log viewer,</li>
+<li>test harness,</li>
+<li>bộ ghi log riêng.</li>
+</ul>
+<h3><code>new_cmd_line_process()</code></h3>
+<p>Đây là tâm điểm của parser/dispatcher.</p>
+<p>Nó tách hẳn việc xử lý một dòng lệnh ra khỏi REPL, nên module này có thể:</p>
+<ul>
+<li>dùng ở interactive shell,</li>
+<li>dùng ở unit test,</li>
+<li>dùng với input đến từ script,</li>
+<li>dùng như backend cho một front-end khác.</li>
+</ul>
+<h3><code>new_cmd_line_run()</code></h3>
+<p>Đây là REPL blocking loop:</p>
+<ul>
+<li>in banner,</li>
+<li>đọc lệnh,</li>
+<li>phát hiện EOF,</li>
+<li>chặn input quá dài,</li>
+<li>chuyển lệnh sang parser.</li>
+</ul>
+<h2>7. Built-in commands đang có</h2>
+<table>
+<thead>
+<tr>
+<th>Lệnh</th>
+<th>Chức năng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>help</code></td>
+<td>Liệt kê tất cả lệnh hoặc chi tiết từng lệnh</td>
+</tr>
+<tr>
+<td><code>about</code></td>
+<td>In mục đích và tính năng chính của shell</td>
+</tr>
+<tr>
+<td><code>version</code></td>
+<td>In tên app, version, ngày giờ build</td>
+</tr>
+<tr>
+<td><code>system</code></td>
+<td>In compiler, platform, chuẩn C và số lượng command</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>In runtime state của shell</td>
+</tr>
+<tr>
+<td><code>time</code></td>
+<td>In local time và uptime</td>
+</tr>
+<tr>
+<td><code>echo</code></td>
+<td>In lại chuỗi đầu vào</td>
+</tr>
+<tr>
+<td><code>prompt</code></td>
+<td>Xem hoặc đổi prompt hiện tại</td>
+</tr>
+<tr>
+<td><code>history</code></td>
+<td>Xem hoặc xóa history</td>
+</tr>
+<tr>
+<td><code>clear</code></td>
+<td>Xóa màn hình bằng ANSI escape code</td>
+</tr>
+<tr>
+<td><code>exit</code></td>
+<td>Thoát khỏi shell</td>
+</tr>
+</tbody>
+</table>
+<p>Một vài chi tiết nhỏ nhưng hữu ích:</p>
+<ul>
+<li><code>prompt</code> tự thêm dấu cách ở cuối nếu cần.</li>
+<li><code>history</code> dùng buffer vòng tròn nên chỉ giữ <code>NEW_CMD_HISTORY_DEPTH</code> lệnh gần nhất.</li>
+<li><code>clear</code> chỉ hoạt động đúng trên terminal hỗ trợ ANSI.</li>
+</ul>
+<h2>8. Workspace manager demo</h2>
+<p>Phần này chỉ được biên dịch khi bật <code>NEW_CMD_LINE_ENABLE_MAIN</code>.</p>
+<h3>8.1. Dữ liệu chính</h3>
+<p>Có 2 struct quan trọng:</p>
+<ul>
+<li><code>new_cmd_project_t</code>
+  lưu <code>relative_path</code> và <code>short_name</code> của từng project.</li>
+<li><code>new_cmd_manager_t</code>
+  lưu <code>workspace_root</code>, danh sách project, số project hiện có, số lần refresh và cờ <code>truncated</code>.</li>
+</ul>
+<p>Ngoài ra còn có một biến toàn cục:</p>
+<ul>
+<li><code>g_manager</code></li>
+</ul>
+<p>Biến này giữ cache project cho suốt vòng đời chương trình.</p>
+<h3>8.2. Cách xác định workspace root</h3>
+<p><code>manager_find_workspace_root()</code>:</p>
+<ul>
+<li>lấy thư mục hiện tại bằng <code>getcwd()</code>,</li>
+<li>đi ngược dần lên parent directory,</li>
+<li>dừng khi thấy thư mục <code>.git</code>.</li>
+</ul>
+<p>Nếu không tìm thấy <code>.git</code>, hàm fallback về thư mục hiện tại.</p>
+<p>Điều này giúp shell chạy từ thư mục con vẫn tìm được workspace root ổn định.</p>
+<h3>8.3. Cách quét project</h3>
+<p>Luồng discovery:</p>
+<ol>
+<li><code>manager_refresh_projects()</code> reset cache cũ.</li>
+<li><code>manager_discover_recursive()</code> quét đệ quy.</li>
+<li>Thư mục nào chứa <code>Makefile</code> hoặc <code>makefile</code> sẽ được xem là một project.</li>
+<li><code>manager_add_project()</code> thêm project mới vào cache.</li>
+</ol>
+<p>Các thư mục bị bỏ qua:</p>
+<ul>
+<li>thư mục ẩn bắt đầu bằng <code>.</code>,</li>
+<li><code>.</code>, <code>..</code>,</li>
+<li><code>out</code>,</li>
+<li><code>build</code>.</li>
+</ul>
+<p>Giới hạn hiện tại:</p>
+<ul>
+<li>tối đa <code>64</code> project,</li>
+<li>độ sâu quét tối đa <code>8</code> cấp.</li>
+</ul>
+<h3>8.4. Cách resolve tên project</h3>
+<p><code>manager_find_project()</code> resolve theo thứ tự:</p>
+<ol>
+<li>so khớp tuyệt đối với <code>relative_path</code>,</li>
+<li>nếu không có thì so khớp với <code>short_name</code>.</li>
+</ol>
+<p>Nếu <code>short_name</code> bị trùng ở nhiều nơi:</p>
+<ul>
+<li>shell báo lỗi ambiguous,</li>
+<li>user phải dùng full relative path.</li>
+</ul>
+<h3>8.5. Cách chạy <code>make</code></h3>
+<p>Tất cả các lệnh <code>build</code>, <code>run</code>, <code>clean</code>, <code>rebuild</code> cuối cùng đều đi về <code>manager_execute_make()</code>.</p>
+<p>Hàm này:</p>
+<ul>
+<li>ghép ra <code>project_path</code>,</li>
+<li>kiểm tra path tồn tại,</li>
+<li>in lệnh sẽ chạy,</li>
+<li><code>fork()</code> tiến trình con,</li>
+<li>gọi <code>execvp("make", args)</code> trong child,</li>
+<li><code>waitpid()</code> ở parent,</li>
+<li>báo thành công hoặc thất bại cho user.</li>
+</ul>
+<p>Ưu điểm của cách này:</p>
+<ul>
+<li>output thật của <code>make</code> được stream thẳng ra terminal,</li>
+<li>không cần tự viết lớp thu log trung gian,</li>
+<li>trải nghiệm gần giống chạy <code>make</code> trực tiếp.</li>
+</ul>
+<h3>8.6. Các lệnh manager</h3>
+<table>
+<thead>
+<tr>
+<th>Lệnh</th>
+<th>Chức năng</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>workspace</code></td>
+<td>In workspace root, số project và số lần refresh</td>
+</tr>
+<tr>
+<td><code>projects</code></td>
+<td>Liệt kê project đã tìm thấy</td>
+</tr>
+<tr>
+<td><code>refresh</code></td>
+<td>Quét lại workspace</td>
+</tr>
+<tr>
+<td><code>build &lt;name&gt;</code></td>
+<td>Chạy <code>make</code></td>
+</tr>
+<tr>
+<td><code>run &lt;name&gt;</code></td>
+<td>Chạy <code>make run</code></td>
+</tr>
+<tr>
+<td><code>clean &lt;name&gt;</code></td>
+<td>Chạy <code>make clean</code></td>
+</tr>
+<tr>
+<td><code>rebuild &lt;name&gt;</code></td>
+<td>Chạy <code>make clean</code> rồi <code>make</code></td>
+</tr>
+</tbody>
+</table>
+<p>Nhóm lệnh <code>build/run/clean/rebuild</code> chấp nhận cả 2 cú pháp:</p>
+<pre><code class="language-text">build cmd-personal
+build project cmd-personal
+</code></pre>
+<h2>9. Interactive terminal và tab completion</h2>
+<p>Phần terminal tương tác được hiện thực bởi các hàm:</p>
+<ul>
+<li><code>interactive_restore_terminal()</code></li>
+<li><code>interactive_signal_handler()</code></li>
+<li><code>interactive_install_handlers()</code></li>
+<li><code>interactive_enable_raw_mode()</code></li>
+<li><code>completion_parse_line()</code></li>
+<li><code>completion_collect_matches()</code></li>
+<li><code>completion_apply_candidate()</code></li>
+<li><code>completion_print_matches()</code></li>
+<li><code>read_line_with_completion()</code></li>
+</ul>
+<h3>9.1. Raw mode</h3>
+<p>Khi chạy trong terminal thật:</p>
+<ul>
+<li>shell tắt <code>ICANON</code>,</li>
+<li>tắt <code>ECHO</code>,</li>
+<li>đọc từng ký tự,</li>
+<li>tự xử lý việc hiển thị.</li>
+</ul>
+<h3>9.2. Completion hỗ trợ những gì</h3>
+<p>Shell hỗ trợ completion cho:</p>
+<ul>
+<li>token đầu tiên là command,</li>
+<li>command sau <code>help</code>,</li>
+<li>tên project sau <code>build</code>, <code>run</code>, <code>clean</code>, <code>rebuild</code>.</li>
+</ul>
+<p>Nếu có đúng 1 match:</p>
+<ul>
+<li>shell tự hoàn thành.</li>
+</ul>
+<p>Nếu có nhiều match:</p>
+<ul>
+<li>shell in danh sách candidate.</li>
+</ul>
+<p>Nếu các match có chung prefix dài hơn phần đã gõ:</p>
+<ul>
+<li>shell tự điền thêm prefix chung.</li>
+</ul>
+<h3>9.3. Xử lý phím đặc biệt</h3>
+<ul>
+<li><code>Enter</code>: kết thúc dòng lệnh.</li>
+<li><code>Backspace</code>: xóa ký tự trước đó.</li>
+<li><code>Tab</code>: trigger completion.</li>
+<li><code>Ctrl + D</code>: thoát nếu dòng hiện tại đang trống.</li>
+</ul>
+<h3>9.4. An toàn khi thoát</h3>
+<p>Code có cài signal handler cho:</p>
+<ul>
+<li><code>SIGINT</code></li>
+<li><code>SIGTERM</code></li>
+<li><code>SIGHUP</code></li>
+</ul>
+<p>Mục tiêu là khôi phục terminal state trước khi chương trình thoát, tránh để terminal bị kẹt ở raw mode.</p>
+<h2>10. Makefile đang làm gì</h2>
+<p><code>Makefile</code> rất gọn và chỉ phục vụ bản demo host-side.</p>
+<h3>Target chính</h3>
+<table>
+<thead>
+<tr>
+<th>Target</th>
+<th>Vai trò</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>all</code></td>
+<td>Mặc định, trỏ sang <code>build</code></td>
+</tr>
+<tr>
+<td><code>build</code></td>
+<td>Biên dịch binary</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td>Chạy binary sau khi build</td>
+</tr>
+<tr>
+<td><code>clean</code></td>
+<td>Xóa thư mục <code>out</code></td>
+</tr>
+</tbody>
+</table>
+<h3>Cách build</h3>
+<p>Binary được build bằng:</p>
+<pre><code class="language-bash">gcc -std=c11 -Wall -Wextra -pedantic new_cmd_line.c -DNEW_CMD_LINE_ENABLE_MAIN -o out/ftel_workspace_manager
+</code></pre>
+<p>Ý nghĩa:</p>
+<ul>
+<li>bật C11,</li>
+<li>bật warning tương đối chặt,</li>
+<li>bật macro <code>NEW_CMD_LINE_ENABLE_MAIN</code>,</li>
+<li>build cả phần demo workspace manager và <code>main()</code>.</li>
+</ul>
+<h2>11. Những điểm đáng chú ý khi đọc code</h2>
+<h3>Điểm tốt</h3>
+<ul>
+<li>Tách khá rõ public API và implementation.</li>
+<li><code>new_cmd_line_process()</code> đủ độc lập để test riêng.</li>
+<li>Có cơ chế attach external commands nên dễ mở rộng.</li>
+<li>Có writer callback để đổi đầu ra.</li>
+<li>Có completion cơ bản nhưng đủ hữu ích.</li>
+<li>Cách gọi <code>make</code> bằng <code>fork + execvp</code> khá sạch.</li>
+</ul>
+<h3>Giới hạn hiện tại</h3>
+<ul>
+<li>Chưa hỗ trợ pipe, redirect, environment variable expansion.</li>
+<li>Chưa có autocompletion cho mọi kiểu command.</li>
+<li>History chỉ nằm trong RAM, không persist xuống file.</li>
+<li>Số lượng args, prompt, history và project đều có giới hạn compile-time.</li>
+<li>Discovery chỉ dựa vào việc có <code>Makefile</code>.</li>
+<li>Binary tên là <code>ftel_workspace_manager</code>, nhưng tên app hiển thị hiện tại là <code>Personal CMD Manager</code>.</li>
+</ul>
+<h3>Hành vi cần để ý</h3>
+<p>Trong chính thư mục <code>cmd-personal</code>, target <code>run</code> của <code>Makefile</code> chạy lại binary manager. Vì vậy:</p>
+<pre><code class="language-text">run cmd-personal
+</code></pre>
+<p>sẽ dẫn đến việc shell gọi <code>make run</code>, và <code>make run</code> lại mở một phiên manager mới.</p>
+<h2>12. Cách mở rộng module này</h2>
+<p>Nếu muốn tái sử dụng module cho project khác, hướng mở rộng hợp lý là:</p>
+<ol>
+<li>Giữ <code>new_cmd_line.h</code> và phần lõi CLI engine.</li>
+<li>Viết bảng <code>new_cmd_command_t</code> mới cho project của bạn.</li>
+<li>Gọi <code>new_cmd_line_attach_commands()</code> để gắn command mới.</li>
+<li>Tùy chọn đổi output bằng <code>new_cmd_line_set_writer()</code>.</li>
+<li>Tùy chọn override các macro cấu hình trong header.</li>
+</ol>
+<p>Ví dụ các hướng mở rộng:</p>
+<ul>
+<li>shell cho UART trên embedded board,</li>
+<li>shell cấu hình thiết bị,</li>
+<li>shell test command cho firmware,</li>
+<li>shell quản lý nhiều tool build khác ngoài <code>make</code>.</li>
+</ul>
+<h2>13. Tóm tắt một câu</h2>
+<p><code>cmd-personal</code> là một personal command manager viết bằng C, xây trên một CLI engine tái sử dụng được, có parser, history, prompt, help, tab completion và một lớp workspace manager để quét project rồi chạy <code>make</code> trực tiếp từ Terminal.</p>
+</body>
+</html>

@@ -2,6 +2,12 @@
 
 `cmd-personal` là một mini shell chạy trên Terminal để quản lý các project có `Makefile` trong workspace. Phần này vừa là ví dụ về cách tự xây dựng command-line interface bằng C, vừa là một công cụ nhỏ để quét project, gọi `make`, `make run`, `make clean`, và `rebuild` ngay trong cùng một phiên shell.
 
+Tài liệu phân tích code chi tiết:
+
+- `CODE_DOCUMENTATION.md`: bản Markdown để đọc trên GitHub và chỉnh sửa tiếp.
+- `CODE_DOCUMENTATION.html`: bản HTML đọc trực tiếp trên máy.
+- `CODE_DOCUMENTATION.pdf`: bản PDF để gửi hoặc in.
+
 ![Minh hoa terminal](./Demo1.png)
 ![Minh hoa terminal](./Demo2.png)
 

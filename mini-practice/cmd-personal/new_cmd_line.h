@@ -17,8 +17,8 @@ extern "C" {
 #include <time.h>
 
 /*
- * Nhóm cấu hình public.
- * Có thể override các macro này trước khi include header nếu project cần
+ * Nhóm cấu hình công khai.
+ * Có thể ghi đè các macro này trước khi include header nếu project cần
  * thay đổi độ dài input, độ sâu history hoặc kích thước prompt.
  */
 #ifndef NEW_CMD_MAX_INPUT_LEN
@@ -39,7 +39,7 @@ extern "C" {
 
 #define NEW_CMD_DEFAULT_PROMPT "ftel> "
 
-/* Mã trạng thái mức cao được trả về bởi parser và bộ điều phối lệnh. */
+/* Mã trạng thái cấp cao được trả về bởi parser và bộ điều phối lệnh. */
 typedef enum {
 	NEW_CMD_STATUS_OK = 0,
 	NEW_CMD_STATUS_EMPTY_INPUT,
@@ -51,13 +51,13 @@ typedef enum {
 	NEW_CMD_STATUS_HANDLER_ERROR
 } new_cmd_status_t;
 
-/* Khai báo trước để handler có thể nhận runtime context. */
+/* Khai báo trước để handler có thể nhận context runtime. */
 typedef struct new_cmd_context new_cmd_context_t;
 
 /* Callback ghi dữ liệu khi cần chuyển hướng output thay vì dùng stdout. */
 typedef void (*new_cmd_writer_t)(const char* text, void* user_data);
 
-/* Kiểu hàm handler dùng cho cả bảng lệnh built-in và bảng lệnh mở rộng. */
+/* Kiểu hàm handler dùng cho cả bảng lệnh tích hợp sẵn và bảng lệnh mở rộng. */
 typedef int32_t (*new_cmd_handler_t)(new_cmd_context_t* ctx, int argc, char* argv[]);
 
 /* Một phần tử trong bảng lệnh: tên, hàm xử lý, cú pháp dùng và mô tả. */
@@ -71,7 +71,7 @@ typedef struct {
 /*
  * Trạng thái runtime của shell.
  * Cấu trúc này được tái sử dụng cho cả module CLI tổng quát và phần demo
- * workspace-manager chạy trên máy host khi biên dịch với
+ * bộ quản lý workspace chạy trên máy host khi biên dịch với
  * NEW_CMD_LINE_ENABLE_MAIN.
  */
 struct new_cmd_context {
@@ -98,13 +98,13 @@ void new_cmd_line_set_writer(new_cmd_context_t* ctx, new_cmd_writer_t writer, vo
 /* Cập nhật prompt đang hiển thị trong vòng lặp REPL tương tác. */
 void new_cmd_line_set_prompt(new_cmd_context_t* ctx, const char* prompt);
 
-/* Gắn thêm bảng lệnh mở rộng bên ngoài, bổ sung cho built-in commands. */
+/* Gắn thêm bảng lệnh mở rộng bên ngoài, bổ sung cho các lệnh tích hợp sẵn. */
 void new_cmd_line_attach_commands(new_cmd_context_t* ctx, const new_cmd_command_t* commands);
 
 /* Yêu cầu vòng lặp tương tác dừng sau khi lệnh hiện tại chạy xong. */
 void new_cmd_line_stop(new_cmd_context_t* ctx);
 
-/* Bắt đầu vòng lặp read-eval-print dạng blocking, đọc từ stdin. */
+/* Bắt đầu vòng lặp đọc-thực thi-in dạng blocking, đọc từ stdin. */
 void new_cmd_line_run(new_cmd_context_t* ctx);
 
 /* In output có định dạng bằng writer đã cấu hình hoặc fallback sang stdout. */
@@ -113,7 +113,7 @@ void new_cmd_line_printf(new_cmd_context_t* ctx, const char* format, ...);
 /* Xử lý một dòng lệnh đơn mà không cần đi vào vòng lặp tương tác. */
 new_cmd_status_t new_cmd_line_process(new_cmd_context_t* ctx, const char* input);
 
-/* Chuyển mã trạng thái sang chuỗi dễ đọc để debug hoặc log. */
+/* Chuyển mã trạng thái sang chuỗi dễ đọc để gỡ lỗi hoặc ghi log. */
 const char* new_cmd_line_status_string(new_cmd_status_t status);
 
 #ifdef __cplusplus

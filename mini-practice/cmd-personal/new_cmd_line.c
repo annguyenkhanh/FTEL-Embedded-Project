@@ -3,13 +3,13 @@
  * @author: Annk
  * @date:   05/04/2026
  *
- * Tong quan module
+ * Tổng quan module
  * ----------------
- * File nay trien khai 2 lop chinh:
- * 1. Mot bo may command-line cho terminal co the tai su dung, bao gom
- *    parsing, history, help, quan ly prompt va dieu phoi lenh.
- * 2. Mot demo workspace manager chay tren may host, co kha nang quet cac
- *    project dung Makefile va goi build target tu mot shell tuong tac duy nhat.
+ * File này triển khai 2 lớp chính:
+ * 1. Một bộ máy command-line cho terminal có thể tái sử dụng, bao gồm
+ *    parsing, history, help, quản lý prompt và điều phối lệnh.
+ * 2. Một demo workspace manager chạy trên máy host, có khả năng quét các
+ *    project dùng Makefile và gọi build target từ một shell tương tác duy nhất.
  ******************************************************************************
 **/
 
@@ -35,7 +35,7 @@
 #define NEW_CMD_OUTPUT_BUFFER_SIZE 512U
 
 /* -------------------------------------------------------------------------- */
-/* Khai bao cac lenh built-in                                                 */
+/* Khai báo các lệnh tích hợp sẵn                                             */
 /* -------------------------------------------------------------------------- */
 static int32_t builtin_help(new_cmd_context_t* ctx, int argc, char* argv[]);
 static int32_t builtin_about(new_cmd_context_t* ctx, int argc, char* argv[]);
@@ -53,7 +53,7 @@ static int32_t builtin_exit(new_cmd_context_t* ctx, int argc, char* argv[]);
 static int read_line_with_completion(new_cmd_context_t* ctx, char* input, size_t input_size);
 #endif
 
-/* Cac lenh built-in luon san sang, ke ca khi khong gan bang lenh ben ngoai. */
+/* Các lệnh tích hợp sẵn luôn sẵn sàng, kể cả khi không gắn bảng lệnh bên ngoài. */
 static const new_cmd_command_t g_builtin_commands[] = {
 	{"help", builtin_help, "help [command]", "Show all commands or detailed help for one command."},
 	{"about", builtin_about, "about", "Display shell purpose and supported features."},
@@ -69,7 +69,7 @@ static const new_cmd_command_t g_builtin_commands[] = {
 	{NULL, NULL, NULL, NULL}
 };
 
-/* Duong xuat mac dinh khi chay o host-terminal mode. */
+/* Đường xuất mặc định khi chạy ở chế độ host-terminal. */
 static void default_writer(const char* text, void* user_data) {
 	FILE* stream = (user_data != NULL) ? (FILE*)user_data : stdout;
 
@@ -77,7 +77,7 @@ static void default_writer(const char* text, void* user_data) {
 	fflush(stream);
 }
 
-/* Dieu huong output cua shell qua writer tuy chinh neu da duoc cau hinh. */
+/* Điều hướng output của shell qua writer tùy chỉnh nếu đã được cấu hình. */
 static void write_text(new_cmd_context_t* ctx, const char* text) {
 	if ((ctx == NULL) || (text == NULL)) {
 		return;
@@ -91,7 +91,7 @@ static void write_text(new_cmd_context_t* ctx, const char* text) {
 	default_writer(text, NULL);
 }
 
-/* So sanh khong phan biet hoa-thuong giup viec go lenh than thien hon. */
+/* So sánh không phân biệt hoa-thường giúp việc gõ lệnh thân thiện hơn. */
 static int command_name_equals(const char* left, const char* right) {
 	unsigned char lhs;
 	unsigned char rhs;
@@ -115,7 +115,7 @@ static int command_name_equals(const char* left, const char* right) {
 	return (*left == '\0') && (*right == '\0');
 }
 
-/* Dem so phan tu trong mot bang lenh ket thuc bang NULL. */
+/* Đếm số phần tử trong một bảng lệnh kết thúc bằng NULL. */
 static uint32_t count_commands(const new_cmd_command_t* table) {
 	uint32_t count = 0U;
 
@@ -130,7 +130,7 @@ static uint32_t count_commands(const new_cmd_command_t* table) {
 	return count;
 }
 
-/* Tim lenh trung khop trong mot bang lenh don le. */
+/* Tìm lệnh trùng khớp trong một bảng lệnh đơn lẻ. */
 static const new_cmd_command_t* find_in_table(const new_cmd_command_t* table, const char* name) {
 	uint32_t index = 0U;
 
@@ -150,9 +150,10 @@ static const new_cmd_command_t* find_in_table(const new_cmd_command_t* table, co
 }
 
 /*
- * Phan giai ten lenh theo thu tu: lenh nguoi dung mo rong truoc, built-in sau.
- * Dau '*' o dau lenh se bi bo qua, de cac kieu go nhu
- * "*Build project demo" van duoc map ve handler "build" thong thuong.
+ * Phân giải tên lệnh theo thứ tự: lệnh mở rộng của người dùng trước, lệnh
+ * tích hợp sẵn sau.
+ * Dấu '*' ở đầu lệnh sẽ bị bỏ qua, để các kiểu gõ như
+ * "*Build project demo" vẫn được map về handler "build" thông thường.
  */
 static const new_cmd_command_t* find_command(const new_cmd_context_t* ctx, const char* name) {
 	const new_cmd_command_t* command = NULL;
@@ -166,7 +167,7 @@ static const new_cmd_command_t* find_command(const new_cmd_context_t* ctx, const
 		lookup_name++;
 	}
 
-	/* Uu tien lenh mo rong de shell co the tai su dung cho nhieu project khac nhau. */
+	/* Ưu tiên lệnh mở rộng để shell có thể tái sử dụng cho nhiều project khác nhau. */
 	command = find_in_table(ctx->external_commands, lookup_name);
 	if (command != NULL) {
 		return command;
@@ -175,12 +176,12 @@ static const new_cmd_command_t* find_command(const new_cmd_context_t* ctx, const
 	return find_in_table(g_builtin_commands, lookup_name);
 }
 
-/* Ham ho tro nho, duoc dung khi in status va help. */
+/* Hàm hỗ trợ nhỏ, được dùng khi in status và help. */
 static uint32_t total_command_count(const new_cmd_context_t* ctx) {
 	return count_commands(g_builtin_commands) + count_commands(ctx != NULL ? ctx->external_commands : NULL);
 }
 
-/* Sao chep prompt va dam bao khong vuot qua gioi han da khai bao khi bien dich. */
+/* Sao chép prompt và đảm bảo không vượt quá giới hạn đã khai báo khi biên dịch. */
 static void copy_prompt(new_cmd_context_t* ctx, const char* prompt) {
 	size_t prompt_length = 0U;
 
@@ -201,7 +202,7 @@ static void copy_prompt(new_cmd_context_t* ctx, const char* prompt) {
 	ctx->prompt[prompt_length] = '\0';
 }
 
-/* Cat bo khoang trang o dau/cuoi truoc khi parse dong lenh. */
+/* Cắt bỏ khoảng trắng ở đầu/cuối trước khi parse dòng lệnh. */
 static new_cmd_status_t copy_trimmed_input(const char* input, char* output, size_t output_size) {
 	const char* start = input;
 	const char* end = NULL;
@@ -236,7 +237,7 @@ static new_cmd_status_t copy_trimmed_input(const char* input, char* output, size
 	return NEW_CMD_STATUS_OK;
 }
 
-/* Luu cac lenh moi nhat vao bo dem history dang vong tron. */
+/* Lưu các lệnh mới nhất vào bộ đệm history dạng vòng tròn. */
 static void push_history(new_cmd_context_t* ctx, const char* command_line) {
 	if ((ctx == NULL) || (command_line == NULL) || (command_line[0] == '\0')) {
 		return;
@@ -253,7 +254,7 @@ static void push_history(new_cmd_context_t* ctx, const char* command_line) {
 	ctx->history_total++;
 }
 
-/* Xoa vong history ma khong anh huong den cac trang thai shell khac. */
+/* Xóa vòng history mà không ảnh hưởng đến các trạng thái shell khác. */
 static void clear_history(new_cmd_context_t* ctx) {
 	uint32_t index = 0U;
 
@@ -270,9 +271,9 @@ static void clear_history(new_cmd_context_t* ctx) {
 }
 
 /*
- * Tach mot dong input thanh cac token kieu argv.
- * Chuoi nam trong dau nhay duoc giu nguyen thanh mot tham so, va cac ky tu
- * escape duoc copy qua de handler nhan duoc danh sach token "sach".
+ * Tách một dòng input thành các token kiểu argv.
+ * Chuỗi nằm trong dấu nháy được giữ nguyên thành một tham số, và các ký tự
+ * escape được copy qua để handler nhận được danh sách token "sạch".
  */
 static new_cmd_status_t tokenize_input(const char* input, char* token_buffer, int* argc_out, char* argv[]) {
 	const char* read_ptr = input;
@@ -284,8 +285,8 @@ static new_cmd_status_t tokenize_input(const char* input, char* token_buffer, in
 	}
 
 	/*
-	 * Tach token vao bo dem tam de argv tro toi cac chuoi on dinh,
-	 * tranh sua truc tiep tren input goc.
+	 * Tách token vào bộ đệm tạm để argv trỏ tới các chuỗi ổn định,
+	 * tránh sửa trực tiếp trên input gốc.
 	 */
 	while (*read_ptr != '\0') {
 		while ((*read_ptr != '\0') && isspace((unsigned char)*read_ptr)) {
@@ -337,7 +338,7 @@ static new_cmd_status_t tokenize_input(const char* input, char* token_buffer, in
 	return (argc == 0) ? NEW_CMD_STATUS_EMPTY_INPUT : NEW_CMD_STATUS_OK;
 }
 
-/* Ghep lai chuoi tu argv[start_index..] cho cac lenh dang echo/prompt. */
+/* Ghép lại chuỗi từ argv[start_index..] cho các lệnh dạng echo/prompt. */
 static void join_arguments(int argc, char* argv[], int start_index, char* output, size_t output_size) {
 	size_t used = 0U;
 	int index = 0;
@@ -371,7 +372,7 @@ static void join_arguments(int argc, char* argv[], int start_index, char* output
 	}
 }
 
-/* Dinh dang gia tri thoi gian thanh timestamp local de doc. */
+/* Định dạng giá trị thời gian thành timestamp local dễ đọc. */
 static void format_time_value(time_t raw_time, char* output, size_t output_size) {
 	struct tm* local_snapshot = NULL;
 
@@ -388,7 +389,7 @@ static void format_time_value(time_t raw_time, char* output, size_t output_size)
 	strftime(output, output_size, "%Y-%m-%d %H:%M:%S", local_snapshot);
 }
 
-/* Dinh dang uptime cua shell theo dang dd hh:mm:ss hoac hh:mm:ss. */
+/* Định dạng uptime của shell theo dạng dd hh:mm:ss hoặc hh:mm:ss. */
 static void format_uptime(const new_cmd_context_t* ctx, char* output, size_t output_size) {
 	long uptime_seconds = 0L;
 	long days = 0L;
@@ -419,7 +420,7 @@ static void format_uptime(const new_cmd_context_t* ctx, char* output, size_t out
 	}
 }
 
-/* Cac ham ho tro ve compiler/platform giup status tu day du thong tin. */
+/* Các hàm hỗ trợ về compiler/platform giúp status in đủ thông tin. */
 static const char* compiler_name(void) {
 #if defined(__clang__)
 	return "Clang/LLVM";
@@ -460,7 +461,7 @@ static const char* c_standard_name(void) {
 #endif
 }
 
-/* In moi lenh tren mot dong gon gon cho phan tom tat cua `help`. */
+/* In mỗi lệnh trên một dòng ngắn gọn cho phần tóm tắt của `help`. */
 static void print_command_summary(new_cmd_context_t* ctx, const new_cmd_command_t* table) {
 	uint32_t index = 0U;
 
@@ -479,7 +480,7 @@ static void print_command_summary(new_cmd_context_t* ctx, const new_cmd_command_
 	}
 }
 
-/* In huong dan chi tiet cho mot lenh cu the. */
+/* In hướng dẫn chi tiết cho một lệnh cụ thể. */
 static void print_command_help(new_cmd_context_t* ctx, const new_cmd_command_t* command) {
 	if ((ctx == NULL) || (command == NULL)) {
 		return;
@@ -498,7 +499,7 @@ static void print_command_help(new_cmd_context_t* ctx, const new_cmd_command_t* 
 	);
 }
 
-/* Don cac byte con sot trong stdin sau khi nguoi dung nhap qua dai. */
+/* Dọn các byte còn sót trong stdin sau khi người dùng nhập quá dài. */
 static void discard_stdin_line(void) {
 	int ch = 0;
 
@@ -507,7 +508,7 @@ static void discard_stdin_line(void) {
 	} while ((ch != '\n') && (ch != EOF));
 }
 
-/* Ham in co dinh dang public, duoc cac command handler goi lai. */
+/* Hàm in có định dạng công khai, được các command handler gọi lại. */
 void new_cmd_line_printf(new_cmd_context_t* ctx, const char* format, ...) {
 	char message[NEW_CMD_OUTPUT_BUFFER_SIZE];
 	va_list arguments;
@@ -523,7 +524,7 @@ void new_cmd_line_printf(new_cmd_context_t* ctx, const char* format, ...) {
 	write_text(ctx, message);
 }
 
-/* Khoi tao runtime context ve trang thai mac dinh, xac dinh ro rang. */
+/* Khởi tạo context runtime về trạng thái mặc định, rõ ràng. */
 void new_cmd_line_init(new_cmd_context_t* ctx, const char* app_name, const char* version) {
 	if (ctx == NULL) {
 		return;
@@ -537,7 +538,7 @@ void new_cmd_line_init(new_cmd_context_t* ctx, const char* app_name, const char*
 	copy_prompt(ctx, NEW_CMD_DEFAULT_PROMPT);
 }
 
-/* Gan writer tuy chinh de sau nay co the nhung shell vao moi truong khac. */
+/* Gắn writer tùy chỉnh để sau này có thể nhúng shell vào môi trường khác. */
 void new_cmd_line_set_writer(new_cmd_context_t* ctx, new_cmd_writer_t writer, void* user_data) {
 	if (ctx == NULL) {
 		return;
@@ -547,12 +548,12 @@ void new_cmd_line_set_writer(new_cmd_context_t* ctx, new_cmd_writer_t writer, vo
 	ctx->writer_user_data = user_data;
 }
 
-/* Ham public de doi prompt, duoc dung boi lenh `prompt` va code ben ngoai. */
+/* Hàm công khai để đổi prompt, được dùng bởi lệnh `prompt` và code bên ngoài. */
 void new_cmd_line_set_prompt(new_cmd_context_t* ctx, const char* prompt) {
 	copy_prompt(ctx, prompt);
 }
 
-/* Gan them bang lenh mo rong dac thu cho tung project. */
+/* Gắn thêm bảng lệnh mở rộng đặc thù cho từng project. */
 void new_cmd_line_attach_commands(new_cmd_context_t* ctx, const new_cmd_command_t* commands) {
 	if (ctx == NULL) {
 		return;
@@ -561,7 +562,7 @@ void new_cmd_line_attach_commands(new_cmd_context_t* ctx, const new_cmd_command_
 	ctx->external_commands = commands;
 }
 
-/* Danh dau de vong lap REPL dung lai. */
+/* Đánh dấu để vòng lặp REPL dừng lại. */
 void new_cmd_line_stop(new_cmd_context_t* ctx) {
 	if (ctx == NULL) {
 		return;
@@ -570,7 +571,7 @@ void new_cmd_line_stop(new_cmd_context_t* ctx) {
 	ctx->running = 0U;
 }
 
-/* Dang chuoi cua status huu ich cho debug hoac test parser API. */
+/* Dạng chuỗi của status hữu ích cho gỡ lỗi hoặc test parser API. */
 const char* new_cmd_line_status_string(new_cmd_status_t status) {
 	switch (status) {
 	case NEW_CMD_STATUS_OK:
@@ -595,9 +596,9 @@ const char* new_cmd_line_status_string(new_cmd_status_t status) {
 }
 
 /*
- * Diem vao xu ly mot dong lenh don.
- * Ham nay co the tai su dung ngoai vong lap tuong tac, vi du cho unit test,
- * input tu script hoac tich hop voi front-end khac.
+ * Điểm vào xử lý một dòng lệnh đơn.
+ * Hàm này có thể tái sử dụng ngoài vòng lặp tương tác, ví dụ cho unit test,
+ * input từ script hoặc tích hợp với front-end khác.
  */
 new_cmd_status_t new_cmd_line_process(new_cmd_context_t* ctx, const char* input) {
 	char command_line[NEW_CMD_MAX_INPUT_LEN];
@@ -612,7 +613,7 @@ new_cmd_status_t new_cmd_line_process(new_cmd_context_t* ctx, const char* input)
 		return NEW_CMD_STATUS_NULL_CONTEXT;
 	}
 
-	/* Luong xu ly: chuan hoa input, luu history, tach argv, tim va goi handler. */
+	/* Luồng xử lý: chuẩn hóa input, lưu history, tách argv, tìm và gọi handler. */
 	status = copy_trimmed_input(input, command_line, sizeof(command_line));
 	if (status == NEW_CMD_STATUS_EMPTY_INPUT) {
 		return status;
@@ -655,7 +656,7 @@ new_cmd_status_t new_cmd_line_process(new_cmd_context_t* ctx, const char* input)
 	return NEW_CMD_STATUS_OK;
 }
 
-/* Vong lap read-eval-print dang blocking cho che do terminal. */
+/* Vòng lặp đọc-thực thi-in đang blocking cho chế độ terminal. */
 void new_cmd_line_run(new_cmd_context_t* ctx) {
 	char input[NEW_CMD_MAX_INPUT_LEN];
 
@@ -663,7 +664,7 @@ void new_cmd_line_run(new_cmd_context_t* ctx) {
 		return;
 	}
 
-	/* REPL blocking don gian danh cho phien terminal tren may host. */
+	/* REPL blocking đơn giản dành cho phiên terminal trên máy host. */
 	ctx->running = 1U;
 	new_cmd_line_printf(ctx, "%s (%s)\n", ctx->app_name, ctx->version);
 	new_cmd_line_printf(ctx, "Interactive shell ready. Type 'help' to list commands.\n\n");
@@ -698,10 +699,10 @@ void new_cmd_line_run(new_cmd_context_t* ctx) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Cac lenh shell built-in                                                    */
+/* Các lệnh shell tích hợp sẵn                                                */
 /* -------------------------------------------------------------------------- */
 
-/* `help` liet ke cac lenh hoac in huong dan chi tiet cho mot lenh. */
+/* `help` liệt kê các lệnh hoặc in hướng dẫn chi tiết cho một lệnh. */
 static int32_t builtin_help(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	const new_cmd_command_t* command = NULL;
 
@@ -734,7 +735,7 @@ static int32_t builtin_help(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return -1;
 }
 
-/* `about` mo ta shell hien tai va cac tinh nang chinh. */
+/* `about` mô tả shell hiện tại và các tính năng chính. */
 static int32_t builtin_about(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
@@ -747,7 +748,7 @@ static int32_t builtin_about(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `version` in thong tin nhan dien cua app va thoi diem build. */
+/* `version` in thông tin nhận diện của app và thời điểm build. */
 static int32_t builtin_version(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
@@ -758,7 +759,7 @@ static int32_t builtin_version(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `system` in thong tin moi truong o thoi diem bien dich. */
+/* `system` in thông tin môi trường ở thời điểm biên dịch. */
 static int32_t builtin_system(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
@@ -770,7 +771,7 @@ static int32_t builtin_system(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `status` in trang thai runtime cua shell nhu uptime va history. */
+/* `status` in trạng thái runtime của shell như uptime và history. */
 static int32_t builtin_status(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	char start_time[32];
 	char uptime[32];
@@ -791,7 +792,7 @@ static int32_t builtin_status(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `time` in thoi gian local hien tai va uptime cua shell. */
+/* `time` in thời gian local hiện tại và uptime của shell. */
 static int32_t builtin_time(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	char now_string[32];
 	char uptime[32];
@@ -808,7 +809,7 @@ static int32_t builtin_time(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `echo` in lai noi dung nguoi dung vua truyen vao. */
+/* `echo` in lại nội dung người dùng vừa truyền vào. */
 static int32_t builtin_echo(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	char output[NEW_CMD_MAX_INPUT_LEN];
 
@@ -822,7 +823,7 @@ static int32_t builtin_echo(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `prompt` hien thi hoac cap nhat chuoi prompt hien tai. */
+/* `prompt` hiển thị hoặc cập nhật chuỗi prompt hiện tại. */
 static int32_t builtin_prompt(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	char new_prompt[NEW_CMD_MAX_PROMPT_LEN];
 	size_t length = 0U;
@@ -844,7 +845,7 @@ static int32_t builtin_prompt(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `history` in bo dem vong tron hoac xoa no neu duoc yeu cau. */
+/* `history` in bộ đệm vòng tròn hoặc xóa nó nếu được yêu cầu. */
 static int32_t builtin_history(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	uint32_t start_index = 0U;
 	uint32_t entry_number = 0U;
@@ -878,7 +879,7 @@ static int32_t builtin_history(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `clear` phat ma ANSI de xoa man hinh terminal tuong thich. */
+/* `clear` phát mã ANSI để xóa màn hình terminal tương thích. */
 static int32_t builtin_clear(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
@@ -887,7 +888,7 @@ static int32_t builtin_clear(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `exit` ket thuc phien tuong tac mot cach gon gang. */
+/* `exit` kết thúc phiên tương tác một cách gọn gàng. */
 static int32_t builtin_exit(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
@@ -903,14 +904,14 @@ static int32_t builtin_exit(new_cmd_context_t* ctx, int argc, char* argv[]) {
 #endif
 
 /* -------------------------------------------------------------------------- */
-/* Phan demo workspace manager                                                */
+/* Phần demo bộ quản lý workspace                                             */
 /* -------------------------------------------------------------------------- */
 
 /*
- * Bo manager ben duoi bien shell thanh cong cu quan ly workspace:
- * - quet repository de tim cac project dung Makefile
- * - phan giai ten project do nguoi dung nhap
- * - chay cac make target trong thu muc project duoc chon
+ * Bộ quản lý bên dưới biến shell thành công cụ quản lý workspace:
+ * - quét repository để tìm các project dùng Makefile
+ * - phân giải tên project do người dùng nhập
+ * - chạy các make target trong thư mục project được chọn
  */
 #define NEW_CMD_MANAGER_MAX_PROJECTS 64U
 #define NEW_CMD_MANAGER_MAX_DEPTH 8U
@@ -920,7 +921,7 @@ typedef struct {
 	char short_name[64];
 } new_cmd_project_t;
 
-/* Trang thai runtime toan cuc cho danh sach project va metadata workspace. */
+/* Trạng thái runtime toàn cục cho danh sách project và metadata workspace. */
 typedef struct {
 	char workspace_root[PATH_MAX];
 	new_cmd_project_t projects[NEW_CMD_MANAGER_MAX_PROJECTS];
@@ -961,7 +962,7 @@ static struct termios g_saved_terminal_state;
 static int g_terminal_raw_active = 0;
 static int g_terminal_handlers_installed = 0;
 
-/* Chuan hoa cach dai dien project goc de caller luon lay duoc path hop le. */
+/* Chuẩn hóa cách đại diện project gốc để caller luôn lấy được path hợp lệ. */
 static const char* manager_project_id(const new_cmd_project_t* project) {
 	if ((project == NULL) || (project->relative_path[0] == '\0')) {
 		return ".";
@@ -970,7 +971,7 @@ static const char* manager_project_id(const new_cmd_project_t* project) {
 	return project->relative_path;
 }
 
-/* Tra ve thanh phan cuoi cua path de hien thi gon hon. */
+/* Trả về thành phần cuối của path để hiển thị gọn hơn. */
 static const char* manager_basename(const char* path) {
 	const char* last_separator = NULL;
 
@@ -982,7 +983,7 @@ static const char* manager_basename(const char* path) {
 	return (last_separator != NULL) ? (last_separator + 1) : path;
 }
 
-/* Noi hai thanh phan path bang dau '/' va van ton trong gioi han buffer. */
+/* Nối hai thành phần path bằng dấu '/' và vẫn tôn trọng giới hạn buffer. */
 static int manager_join_path(const char* base, const char* child, char* output, size_t output_size) {
 	int written = 0;
 
@@ -1007,7 +1008,7 @@ static int manager_join_path(const char* base, const char* child, char* output, 
 	return 0;
 }
 
-/* Cac ham ho tro filesystem cho qua trinh quet workspace va chay lenh. */
+/* Các hàm hỗ trợ filesystem cho quá trình quét workspace và chạy lệnh. */
 static int manager_is_directory(const char* path) {
 	struct stat info;
 
@@ -1023,7 +1024,7 @@ static int manager_path_exists(const char* path) {
 	return ((path != NULL) && (stat(path, &info) == 0)) ? 1 : 0;
 }
 
-/* Tim root cua repository bang cach di nguoc len den khi gap thu muc .git. */
+/* Tìm root của repository bằng cách đi ngược lên đến khi gặp thư mục .git. */
 static int manager_find_workspace_root(char* output, size_t output_size) {
 	char current[PATH_MAX];
 	char marker_path[PATH_MAX];
@@ -1038,8 +1039,8 @@ static int manager_find_workspace_root(char* output, size_t output_size) {
 	}
 
 	/*
-	 * Di nguoc len tung cap den khi gap .git. Cach nay giup manager co
-	 * mot workspace root on dinh ngay ca khi duoc chay trong thu muc con.
+	 * Đi ngược lên từng cấp đến khi gặp .git. Cách này giúp manager có
+	 * một workspace root ổn định ngay cả khi được chạy trong thư mục con.
 	 */
 	for (;;) {
 		if (manager_join_path(current, ".git", marker_path, sizeof(marker_path)) == 0) {
@@ -1074,7 +1075,7 @@ static int manager_find_workspace_root(char* output, size_t output_size) {
 	return 0;
 }
 
-/* Bo qua cac thu muc khong bao gio nen xem la project cua nguoi dung. */
+/* Bỏ qua các thư mục không bao giờ nên xem là project của người dùng. */
 static int manager_should_skip_directory(const char* name) {
 	if ((name == NULL) || (name[0] == '\0')) {
 		return 1;
@@ -1095,14 +1096,14 @@ static int manager_should_skip_directory(const char* name) {
 	return 0;
 }
 
-/* Xoa danh sach project trong RAM truoc moi lan quet lai. */
+/* Xóa danh sách project trong RAM trước mỗi lần quét lại. */
 static void manager_reset_projects(void) {
 	memset(g_manager.projects, 0, sizeof(g_manager.projects));
 	g_manager.project_count = 0U;
 	g_manager.truncated = 0U;
 }
 
-/* Them mot project vua tim thay, bo qua duplicate va tranh tran gioi han. */
+/* Thêm một project vừa tìm thấy, bỏ qua bản trùng và tránh tràn giới hạn. */
 static void manager_add_project(const char* relative_path) {
 	uint32_t index = 0U;
 	const char* final_path = relative_path;
@@ -1148,8 +1149,8 @@ static void manager_add_project(const char* relative_path) {
 }
 
 /*
- * Quet de quy workspace de tim cac thu muc co Makefile.
- * Gioi han do sau giup tranh viec di qua sau trong cay thu muc qua lon.
+ * Quét đệ quy workspace để tìm các thư mục có Makefile.
+ * Giới hạn độ sâu giúp tránh việc đi quá sâu trong cây thư mục quá lớn.
  */
 static int manager_discover_recursive(const char* relative_path, uint32_t depth) {
 	char absolute_path[PATH_MAX];
@@ -1170,7 +1171,7 @@ static int manager_discover_recursive(const char* relative_path, uint32_t depth)
 		return -1;
 	}
 
-	/* Mot thu muc duoc xem la "project" neu no chua Makefile/makefile. */
+	/* Một thư mục được xem là "project" nếu nó chứa Makefile/makefile. */
 	while ((entry = readdir(directory)) != NULL) {
 		char child_absolute[PATH_MAX];
 		struct stat child_info;
@@ -1221,7 +1222,7 @@ static int manager_discover_recursive(const char* relative_path, uint32_t depth)
 	return 0;
 }
 
-/* Tao lai danh sach project duoc cache tu workspace hien tai. */
+/* Tạo lại danh sách project được cache từ workspace hiện tại. */
 static int manager_refresh_projects(new_cmd_context_t* ctx) {
 	manager_reset_projects();
 	g_manager.refresh_count++;
@@ -1248,7 +1249,7 @@ static int manager_refresh_projects(new_cmd_context_t* ctx) {
 	return 0;
 }
 
-/* Khoi dong mot lan cho lop workspace-manager. */
+/* Khởi động một lần cho lớp workspace-manager. */
 static void manager_initialize(new_cmd_context_t* ctx) {
 	memset(&g_manager, 0, sizeof(g_manager));
 	(void)ctx;
@@ -1261,7 +1262,7 @@ static void manager_initialize(new_cmd_context_t* ctx) {
 	(void)manager_refresh_projects(NULL);
 }
 
-/* Phan giai ten project nguoi dung nhap: uu tien full path, sau do short name. */
+/* Phân giải tên project người dùng nhập: ưu tiên full path, sau đó short name. */
 static const new_cmd_project_t* manager_find_project(const char* query, int* ambiguous) {
 	const new_cmd_project_t* match = NULL;
 	uint32_t index = 0U;
@@ -1654,11 +1655,11 @@ static int completion_apply_candidate(
 	return 0;
 }
 
-/* Parser dung chung cho nhom lenh co dang `build [project] <name>`. */
+/* Parser dùng chung cho nhóm lệnh có dạng `build [project] <name>`. */
 static const char* manager_parse_project_argument(new_cmd_context_t* ctx, int argc, char* argv[], const char* usage) {
 	int index = 1;
 
-	/* Chap nhan ca "build demo" lan "build project demo" de CLI than thien hon. */
+	/* Chấp nhận cả "build demo" lẫn "build project demo" để CLI thân thiện hơn. */
 	if ((argc > 1) && command_name_equals(argv[1], "project") != 0) {
 		index = 2;
 	}
@@ -1671,7 +1672,7 @@ static const char* manager_parse_project_argument(new_cmd_context_t* ctx, int ar
 	return argv[index];
 }
 
-/* Phan giai ten project vua nhap dua tren danh sach project moi nhat. */
+/* Phân giải tên project vừa nhập dựa trên danh sách project mới nhất. */
 static int manager_resolve_project(
 	new_cmd_context_t* ctx,
 	const char* query,
@@ -1701,9 +1702,9 @@ static int manager_resolve_project(
 }
 
 /*
- * Chay mot make target trong project duoc chon.
- * Output duoc stream truc tiep ra terminal de manager dong vai tro
- * dieu phoi nhe, thay vi tro thanh bo thu thap build log.
+ * Chạy một make target trong project được chọn.
+ * Output được stream trực tiếp ra terminal để manager đóng vai trò
+ * điều phối nhẹ, thay vì trở thành bộ thu thập build log.
  */
 static int manager_execute_make(new_cmd_context_t* ctx, const new_cmd_project_t* project, const char* target) {
 	char project_path[PATH_MAX];
@@ -1736,8 +1737,8 @@ static int manager_execute_make(new_cmd_context_t* ctx, const new_cmd_project_t*
 	fflush(stderr);
 
 	/*
-	 * fork + execvp giup output that cua make chay thang ra terminal,
-	 * thay vi bi gom vao mot buffer trong shell nay.
+	 * fork + execvp giúp output thật của make chạy thẳng ra terminal,
+	 * thay vì bị gom vào một buffer trong shell này.
 	 */
 	child = fork();
 	if (child < 0) {
@@ -1796,7 +1797,7 @@ static int manager_execute_make(new_cmd_context_t* ctx, const new_cmd_project_t*
 	return -1;
 }
 
-/* In bang project da tim thay theo dinh dang gon va de doc. */
+/* In bảng project đã tìm thấy theo định dạng gọn và dễ đọc. */
 static void manager_print_projects(new_cmd_context_t* ctx) {
 	uint32_t index = 0U;
 
@@ -1816,7 +1817,7 @@ static void manager_print_projects(new_cmd_context_t* ctx) {
 	}
 }
 
-/* `workspace` in root hien tai cua repository va tom tat ket qua quet. */
+/* `workspace` in root hiện tại của repository và tóm tắt kết quả quét. */
 static int32_t manager_workspace(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
@@ -1833,7 +1834,7 @@ static int32_t manager_workspace(new_cmd_context_t* ctx, int argc, char* argv[])
 	return 0;
 }
 
-/* `projects` liet ke cac thu muc project dang duoc tim thay. */
+/* `projects` liệt kê các thư mục project đang được tìm thấy. */
 static int32_t manager_projects(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	if ((argc == 2) && (command_name_equals(argv[1], "refresh") == 0)) {
 		new_cmd_line_printf(ctx, "Usage: projects [refresh]\n");
@@ -1853,7 +1854,7 @@ static int32_t manager_projects(new_cmd_context_t* ctx, int argc, char* argv[]) 
 	return 0;
 }
 
-/* `refresh` bat buoc quet lai workspace. */
+/* `refresh` bắt buộc quét lại workspace. */
 static int32_t manager_refresh(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	(void)argc;
 	(void)argv;
@@ -1866,7 +1867,7 @@ static int32_t manager_refresh(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return 0;
 }
 
-/* `build` chay make target mac dinh cho project duoc chon. */
+/* `build` chạy make target mặc định cho project được chọn. */
 static int32_t manager_build(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	const char* query = NULL;
 	const new_cmd_project_t* project = NULL;
@@ -1883,7 +1884,7 @@ static int32_t manager_build(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return manager_execute_make(ctx, project, NULL);
 }
 
-/* `run` thuc thi target `make run` cua project. */
+/* `run` thực thi target `make run` của project. */
 static int32_t manager_run(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	const char* query = NULL;
 	const new_cmd_project_t* project = NULL;
@@ -1900,7 +1901,7 @@ static int32_t manager_run(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return manager_execute_make(ctx, project, "run");
 }
 
-/* `clean` thuc thi target `make clean` cua project. */
+/* `clean` thực thi target `make clean` của project. */
 static int32_t manager_clean(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	const char* query = NULL;
 	const new_cmd_project_t* project = NULL;
@@ -1917,7 +1918,7 @@ static int32_t manager_clean(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	return manager_execute_make(ctx, project, "clean");
 }
 
-/* `rebuild` la wrapper tien loi cho clean roi den build. */
+/* `rebuild` là wrapper tiện lợi cho clean rồi đến build. */
 static int32_t manager_rebuild(new_cmd_context_t* ctx, int argc, char* argv[]) {
 	const char* query = NULL;
 	const new_cmd_project_t* project = NULL;
@@ -1939,11 +1940,11 @@ static int32_t manager_rebuild(new_cmd_context_t* ctx, int argc, char* argv[]) {
 }
 
 /*
- * Bo doc dong tuong tac co ho tro tab completion nhe.
- * Cach nay giu shell khong phu thuoc them thu vien ngoai, nhung van ho tro:
- * - hoan thanh lenh o token dau tien
- * - hoan thanh ten lenh sau `help`
- * - hoan thanh ten project sau build/run/clean/rebuild
+ * Bộ đọc dòng tương tác có hỗ trợ tab completion nhẹ.
+ * Cách này giữ shell không phụ thuộc thêm thư viện ngoài, nhưng vẫn hỗ trợ:
+ * - hoàn thành lệnh ở token đầu tiên
+ * - hoàn thành tên lệnh sau `help`
+ * - hoàn thành tên project sau build/run/clean/rebuild
  */
 static int read_line_with_completion(new_cmd_context_t* ctx, char* input, size_t input_size) {
 	const char* matches[(NEW_CMD_MANAGER_MAX_PROJECTS * 2U) + 32U];
@@ -2079,11 +2080,11 @@ static int read_line_with_completion(new_cmd_context_t* ctx, char* input, size_t
 	return 0;
 }
 
-/* Diem vao standalone cho host-terminal khi bat NEW_CMD_LINE_ENABLE_MAIN. */
+/* Điểm vào standalone cho host-terminal khi bật NEW_CMD_LINE_ENABLE_MAIN. */
 int main(void) {
 	new_cmd_context_t ctx;
 
-	/* Chuoi khoi dong cho demo workspace manager chay tren may host. */
+	/* Chuỗi khởi động cho demo workspace manager chạy trên máy host. */
 	new_cmd_line_init(&ctx, "Personal CMD Manager", "v.0.0.1");
 	manager_initialize(&ctx);
 	new_cmd_line_attach_commands(&ctx, g_demo_commands);

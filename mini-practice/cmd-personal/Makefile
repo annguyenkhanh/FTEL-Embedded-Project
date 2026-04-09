@@ -1,5 +1,5 @@
-# File build cuc bo don gian cho demo workspace manager chay tren may host.
-# Binary duoc dat trong `out/` de tach file sinh ra khoi source tree.
+# File build cục bộ đơn giản cho demo bộ quản lý workspace chạy trên máy host.
+# Binary được đặt trong `out/` để tách file sinh ra khỏi cây source.
 CC := gcc
 CFLAGS := -std=c11 -Wall -Wextra -pedantic
 TARGET := ftel_workspace_manager
@@ -7,27 +7,27 @@ SRC := new_cmd_line.c
 OUT_DIR := out
 OUTPUT := $(OUT_DIR)/$(TARGET)
 
-# Phony target khong anh xa truc tiep toi file that va luon duoc chay khi goi.
+# Phony target không ánh xạ trực tiếp tới file thật và luôn được chạy khi gọi.
 .PHONY: all build run clean
 
-# Diem vao mac dinh khi nguoi dung chi go `make`.
+# Điểm vào mặc định khi người dùng chỉ gõ `make`.
 all: build
 
-# Chi build binary cua manager.
+# Chỉ build binary của bộ quản lý.
 build: $(OUTPUT)
 
-# Bien dich voi `main()` standalone de chay truc tiep tren terminal.
+# Biên dịch với `main()` độc lập để chạy trực tiếp trên terminal.
 $(OUTPUT): $(SRC) new_cmd_line.h | $(OUT_DIR)
 	$(CC) $(CFLAGS) $(SRC) -DNEW_CMD_LINE_ENABLE_MAIN -o $(OUTPUT)
 
-# Tao thu muc output neu hien tai chua ton tai.
+# Tạo thư mục output nếu hiện tại chưa tồn tại.
 $(OUT_DIR):
 	mkdir -p $(OUT_DIR)
 
-# Chay manager tuong tac sau khi dam bao binary da duoc tao.
+# Chạy bộ quản lý tương tác sau khi đảm bảo binary đã được tạo.
 run: $(OUTPUT)
 	./$(OUTPUT)
 
-# Xoa cac file sinh ra va dua thu muc build ve trang thai sach.
+# Xóa các file sinh ra và đưa thư mục build về trạng thái sạch.
 clean:
 	rm -rf $(OUT_DIR)
